@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Votação de Palavras</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #f7f7f7;
+        padding: 20px;
+        text-align: center;
+      }
+
+      h1 {
+        color: #333;
+      }
+
+      #wordInput {
+        padding: 12px 20px;
+        font-size: 16px;
+        width: 250px;
+        margin: 20px 0;
+        border-radius: 10px;
+        border: 2px solid #007bff;
+        background-color: #ffffff;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        transition: border-color 0.3s, box-shadow 0.3s;
+      }
+
+      #wordInput:focus {
+        outline: none;
+        border-color: #28a745;
+        box-shadow: 0 0 8px rgba(40, 167, 69, 0.6);
+      }
+
+      button {
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+
+      button:hover {
+        background-color: #0056b3;
+      }
+
+      #wordsList {
+        margin-top: 20px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+
+      .word {
+        cursor: pointer;
+        padding: 15px;
+        border: 2px solid #007bff;
+        border-radius: 8px;
+        margin: 10px;
+        display: inline-block;
+        width: 200px;
+        background-color: #fff;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        transition: transform 0.3s ease;
+      }
+
+      .word:hover {
+        transform: scale(1.05);
+      }
+
+      .word.voted {
+        background-color: #d4edda;
+        border-color: #28a745;
+        pointer-events: none;
+      }
+
+      #votingStatus {
+        margin-top: 20px;
+        font-size: 18px;
+        color: #ff9800;
+      }
+
+      #winner {
+        margin-top: 30px;
+        font-size: 20px;
+        font-weight: bold;
+        color: #28a745;
+      }
+
+      #voteMessage {
+        font-size: 14px;
+        color: #777;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Digite uma palavra e vote uma da lista</h1>
+    <input type="text" id="wordInput" placeholder="Digite uma palavra" />
+    <button onclick="addWord()">Adicionar Palavra</button>
+
+    <h2>Votação</h2>
+    <div id="wordsList"></div>
+
+    <div id="votingStatus">Aguardando os votos...</div>
+    <div id="voteMessage">Clique em uma palavra para votar.</div>
+
+    <div id="winner"></div>
+
+    <script>
+      const socket = io();
+      let hasVoted = false;
+
+      // Adicionar nova palavra
+      function addWord() {
+        const word = document.getElementById("wordInput").value.trim();
+        if (word) {
+          socket.emit("addWord", word);
+          document.getElementById("wordInput").value = "";
+        }
+      }
+
+      // Votação em uma palavra
+      function voteWord(word) {
+        if (hasVoted) return; // Impede que o usuário vote mais de uma vez
+        const wordDiv = document.getElementById(word);
+        if (!wordDiv.classList.contains("voted")) {
+          socket.emit("voteWord", word);
+          wordDiv.classList.add("voted"); // Marca a palavra como já votada
+          hasVoted = true;
+        }
+      }
+
+      // Atualizar lista de palavras
+      socket.on("updateWords", (data) => {
+        const wordsList = document.getElementById("wordsList");
+        wordsList.innerHTML = "";
+
+        Object.keys(data.words).forEach((word) => {
+          const wordDiv = document.createElement("div");
+          wordDiv.className = "word";
+          wordDiv.id = word;
+          wordDiv.innerHTML = `${word} - ${data.words[word].votes} votos`;
+          wordDiv.onclick = () => voteWord(word);
+          wordsList.appendChild(wordDiv);
+        });
+
+        if (data.totalVotes === data.totalUsers) {
+          document.getElementById("votingStatus").innerHTML =
+            "Votação encerrada!";
+          document.getElementById("voteMessage").style.display = "none";
+        } else {
+          document.getElementById("votingStatus").innerHTML =
+            "Votação em andamento!"; // (${data.totalVotes}/${data.totalUsers})`;
+        }
+      });
+
+      // Mostrar vencedor
+      socket.on("winner", (winner) => {
+        const winnerDiv = document.getElementById("winner");
+        winnerDiv.innerHTML = `A palavra vencedora é: <strong>${winner}</strong>`;
+        document.getElementById("votingStatus").style.display = "none"; // Esconde o status da votação
+      });
+    </script>
+  </body>
+</html>
